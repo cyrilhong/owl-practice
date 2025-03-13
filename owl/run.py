@@ -1,16 +1,3 @@
-# ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ========= Copyright 2023-2024 @ CAMEL-AI.org. All Rights Reserved. =========
 from dotenv import load_dotenv
 from camel.models import ModelFactory
 from camel.toolkits import (
@@ -20,99 +7,81 @@ from camel.toolkits import (
     ImageAnalysisToolkit,
     SearchToolkit,
     VideoAnalysisToolkit,
-    WebToolkit,
+    BrowserToolkit,
     FileWriteToolkit,
 )
 from camel.types import ModelPlatformType, ModelType
 from camel.logger import set_log_level
-
 from utils import OwlRolePlaying, run_society, DocumentProcessingToolkit
+import time
+import os
 
 load_dotenv()
-
 set_log_level(level="DEBUG")
+
+print(f"GOOGLE_API_KEY: {os.getenv('GOOGLE_API_KEY')}")
+print(f"SEARCH_ENGINE_ID: {os.getenv('SEARCH_ENGINE_ID')}")
 
 
 def construct_society(question: str) -> OwlRolePlaying:
-    r"""Construct a society of agents based on the given question.
-
-    Args:
-        question (str): The task or question to be addressed by the society.
-
-    Returns:
-        OwlRolePlaying: A configured society of agents ready to address the question.
-    """
-
-    # Create models for different components
     models = {
         "user": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "assistant": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "web": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "planning": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "video": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "image": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
         "document": ModelFactory.create(
             model_platform=ModelPlatformType.OPENAI,
-            model_type=ModelType.GPT_4O,
-            model_config_dict={"temperature": 0},
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={"temperature": 0, "max_tokens": 4000},
         ),
     }
-
-    # Configure toolkits
     tools = [
-        *WebToolkit(
-            headless=False,  # Set to True for headless mode (e.g., on remote servers)
+        *BrowserToolkit(
+            headless=False,
             web_agent_model=models["web"],
             planning_agent_model=models["planning"],
         ).get_tools(),
         *VideoAnalysisToolkit(model=models["video"]).get_tools(),
-        *AudioAnalysisToolkit().get_tools(),  # This requires OpenAI Key
+        *AudioAnalysisToolkit().get_tools(),
         *CodeExecutionToolkit(sandbox="subprocess", verbose=True).get_tools(),
         *ImageAnalysisToolkit(model=models["image"]).get_tools(),
         SearchToolkit().search_duckduckgo,
-        SearchToolkit().search_google,  # Comment this out if you don't have google search
+        SearchToolkit().search_google,
         SearchToolkit().search_wiki,
         *ExcelToolkit().get_tools(),
         *DocumentProcessingToolkit(model=models["document"]).get_tools(),
         *FileWriteToolkit(output_dir="./").get_tools(),
     ]
-
-    # Configure agent roles and parameters
     user_agent_kwargs = {"model": models["user"]}
     assistant_agent_kwargs = {"model": models["assistant"], "tools": tools}
-
-    # Configure task parameters
-    task_kwargs = {
-        "task_prompt": question,
-        "with_task_specify": False,
-    }
-
-    # Create and return the society
-    society = OwlRolePlaying(
+    task_kwargs = {"task_prompt": question, "with_task_specify": False}
+    return OwlRolePlaying(
         **task_kwargs,
         user_role_name="user",
         user_agent_kwargs=user_agent_kwargs,
@@ -120,20 +89,34 @@ def construct_society(question: str) -> OwlRolePlaying:
         assistant_agent_kwargs=assistant_agent_kwargs,
     )
 
-    return society
-
 
 def main():
     r"""Main function to run the OWL system with an example question."""
-    # Example research question
-    question = "Navigate to Amazon.com and identify one product that is attractive to coders. Please provide me with the product name and price. No need to verify your answer."
-
-    # Construct and run the society
+    question = "搜集台灣的酒類相關課程或證照資訊，並整理成表格，每個證照為單位，表格需包含以下欄位：課名、課程資訊、時間、地點、費用。步驟：1) 優先使用 Google 搜尋 '台灣 酒類 課程 證照'（使用 GOOGLE_API_KEY 和 SEARCH_ENGINE_ID，num_result_pages=3），若失敗則使用 DuckDuckGo 搜尋相同關鍵詞；2) 從結果中選取 3-5 個證照相關課程；3) 針對每個證照，從搜尋結果或相關網站提取課名、課程資訊（簡述課程內容）、時間（開課日期或時段）、地點（具體地點或城市）、費用（具體金額，若無則標記為需進一步確認），並將提取的資訊整理成表格；4) 將表格儲存為 CSV 檔案 'alcohol_courses.csv'，使用 FileWriteToolkit 的 write_file 工具，檔案路徑為 './alcohol_courses.csv'，確保 CSV 包含表頭（課名,課程資訊,時間,地點,費用）和資料列。"
     society = construct_society(question)
-    answer, chat_history, token_count = run_society(society)
-
-    # Output the result
-    print(f"\033[94mAnswer: {answer}\033[0m")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            answer, chat_history, token_count = run_society(society)
+            if answer is None:
+                print(
+                    f"Attempt {attempt + 1} returned None, chat_history: {chat_history}"
+                )
+                time.sleep(10)
+                continue
+            print(f"\033[94mAnswer: {answer}\033[0m")
+            print(
+                "Please verify the final answer using multiple tools (e.g., screenshots, webpage analysis)."
+            )
+            print(
+                "CSV file 'alcohol_courses.csv' should be generated in the current directory."
+            )
+            break
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            time.sleep(10)
+            if attempt == max_retries - 1:
+                print("All retries failed.")
 
 
 if __name__ == "__main__":
